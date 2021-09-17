@@ -52,7 +52,7 @@ void* KNN(void* data) {
     // Stores bincounts of each class over the final set of candidate NN
     int* classCounts = (int*)calloc(num_classes, sizeof(int));
     int start = id * test->num_instances()/ n_threads;
-    int end = (id + 1) * test->num_instances()/ n_threads;
+    int end = min(test->num_instances(), (id + 1) * test->num_instances()/ n_threads);
     for (int queryIndex = start; queryIndex < end; queryIndex++) {
         for (int keyIndex = 0; keyIndex < train->num_instances(); keyIndex++) {
             float dist = distance(test->get_instance(queryIndex), train->get_instance(keyIndex));
@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
     struct arguments arg_array[n_threads];
     clock_gettime(CLOCK_MONOTONIC_RAW, &start);
     //  linux can use sem_init, mac can't
-    // sem_init(&sem_main, 0, n_threads - 1);
+    // sem_init(&sem_main, 0, n_threads);
     sem_open("/sem_main", NULL, NULL, n_threads);
     for (int i = 0; i < n_threads; i++) {
         arg_array[i].train = train;
