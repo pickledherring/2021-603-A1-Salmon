@@ -8,7 +8,7 @@
 #include <semaphore.h>
 #include "libarff/arff_parser.h"
 #include "libarff/arff_data.h"
-#include <bits_file/stdc++.h>
+#include "bits_file/stdc++.h"
 // #include <bits/stdc++.h>
 
 using namespace std;
@@ -22,7 +22,7 @@ struct arguments{
     int n_threads;
 };
 
-sem_t sem_main;
+sem_t * sem_main;
 
 float distance(ArffInstance* a, ArffInstance* b) {
     float sum = 0;
@@ -51,9 +51,9 @@ void* KNN(void* data) {
     int num_classes = train->num_classes();
     // Stores bincounts of each class over the final set of candidate NN
     int* classCounts = (int*)calloc(num_classes, sizeof(int));
-    int queryIndex = id * test->num_instances()/ n_threads;
+    int start = id * test->num_instances()/ n_threads;
     int end = (id + 1) * test->num_instances()/ n_threads;
-    for (queryIndex; queryIndex < end; queryIndex++) {
+    for (int queryIndex = start; queryIndex < end; queryIndex++) {
         for (int keyIndex = 0; keyIndex < train->num_instances(); keyIndex++) {
             float dist = distance(test->get_instance(queryIndex), train->get_instance(keyIndex));
             // Add to our candidates
@@ -93,7 +93,7 @@ void* KNN(void* data) {
         for(int i = 0; i < 2*k; i++) {candidates[i] = FLT_MAX;}
         memset(classCounts, 0, num_classes * sizeof(int));
     }
-    sem_post(&sem_main);
+    sem_post(sem_main);
     pthread_exit(0);
 }
 
@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-    int n_threads = (int) argv[4];
+    int n_threads = strtol(argv[4], NULL, 10);
     pthread_t *threads;
     threads = (pthread_t*)malloc(n_threads * sizeof(pthread_t));
     int k = strtol(argv[3], NULL, 10);
@@ -141,10 +141,11 @@ int main(int argc, char *argv[]) {
     // predictions is the array where you have to return the class predicted (integer) for the test dataset instances
     int * predictions = (int*)malloc(test->num_instances() * sizeof(int));
     struct timespec start, end;
-    int * predictions = NULL;
     struct arguments arg_array[n_threads];
     clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-    sem_init(&sem_main, 0, n_threads - 1);
+    //  linux can use sem_init, mac can't
+    // sem_init(&sem_main, 0, n_threads - 1);
+    sem_open("/sem_main", NULL, NULL, n_threads);
     for (int i = 0; i < n_threads; i++) {
         arg_array[i].train = train;
         arg_array[i].test = test;
@@ -154,7 +155,7 @@ int main(int argc, char *argv[]) {
         arg_array[i].n_threads = n_threads;
         pthread_create(&threads[i], NULL, KNN, (void*) &arg_array[i]);
     }
-    sem_wait(&sem_main);
+    sem_wait(sem_main);
     for (int i = 0; i < n_threads; i++)
         pthread_join(threads[i], NULL);
 
