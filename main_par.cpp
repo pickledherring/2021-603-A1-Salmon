@@ -8,8 +8,8 @@
 #include <semaphore.h>
 #include "libarff/arff_parser.h"
 #include "libarff/arff_data.h"
-#include "bits_file/stdc++.h"
-// #include <bits/stdc++.h>
+// #include "bits_file/stdc++.h"
+#include <bits/stdc++.h>
 
 using namespace std;
 
@@ -21,8 +21,10 @@ struct arguments{
     int id;
     int n_threads;
 };
-
-sem_t * sem_main;
+ // sem_init needs a regular semaphore while sem_open needs a pointer to one
+ // linux top, mac bottom
+sem_t sem_main;
+// sem_t * sem_main;
 
 float distance(ArffInstance* a, ArffInstance* b) {
     float sum = 0;
@@ -93,7 +95,9 @@ void* KNN(void* data) {
         for(int i = 0; i < 2*k; i++) {candidates[i] = FLT_MAX;}
         memset(classCounts, 0, num_classes * sizeof(int));
     }
-    sem_post(sem_main);
+    // linux top, mac bottom
+    sem_post(&sem_main);
+    // sem_post(sem_main);
     pthread_exit(0);
 }
 
@@ -144,8 +148,8 @@ int main(int argc, char *argv[]) {
     struct arguments arg_array[n_threads];
     clock_gettime(CLOCK_MONOTONIC_RAW, &start);
     //  linux can use sem_init, mac can't
-    // sem_init(&sem_main, 0, n_threads);
-    sem_open("/sem_main", NULL, NULL, n_threads);
+    sem_init(&sem_main, 0, n_threads);
+    // sem_open("/sem_main", NULL, NULL, n_threads);
     for (int i = 0; i < n_threads; i++) {
         arg_array[i].train = train;
         arg_array[i].test = test;
@@ -155,7 +159,9 @@ int main(int argc, char *argv[]) {
         arg_array[i].n_threads = n_threads;
         pthread_create(&threads[i], NULL, KNN, (void*) &arg_array[i]);
     }
-    sem_wait(sem_main);
+    // linux top, mac bottom
+    sem_wait(&sem_main);
+    // sem_wait(sem_main);
     for (int i = 0; i < n_threads; i++)
         pthread_join(threads[i], NULL);
 
