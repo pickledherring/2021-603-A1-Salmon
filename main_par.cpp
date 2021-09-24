@@ -46,7 +46,6 @@ void* KNN(void* data) {
     int k = args->k;
     int id = args->id;
     int n_threads = args->n_threads;
-
     // stores k-NN candidates for a query vector as a sorted 2d array. First element is inner product, second is class.
     float* candidates = (float*)calloc(k * 2, sizeof(float));
     for(int i = 0; i < 2 * k; i++) {candidates[i] = FLT_MAX;}
@@ -147,7 +146,6 @@ int main(int argc, char* argv[]) {
     struct timespec start, end;
     struct arguments arg_array[n_threads];
     clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-    
     //  linux can use sem_init, mac can't
     // sem_init(&sem_main, 0, n_threads);
     sem_open("sem_main", NULL, NULL, n_threads);

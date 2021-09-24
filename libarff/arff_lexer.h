@@ -8,9 +8,9 @@
 
 #include <string>
 
-#include <arff_utils.h>
-#include <arff_scanner.h>
-#include <arff_token.h>
+#include "arff_utils.h"
+#include "arff_scanner.h"
+#include "arff_token.h"
 
 
 /**

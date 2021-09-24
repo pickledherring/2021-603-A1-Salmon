@@ -18,27 +18,25 @@ struct arguments{
     ArffData *  test;
     int * predictions;
     int k;
-}
+};
 
-float distance(float* a, ArffInstance* b) {
+float distance(float *a, ArffInstance* b) {
     float sum = 0;
-    
     for (int i = 0; i < b->size()-1; i++) {
         float diff = (a[i] - b->get(i)->operator float());
         sum += diff*diff;
     }
-
     return sum;
 }
 
-void KNN(struct arguments* data) {
+void KNN(struct arguments data) {
     /* Implements a sequential kNN where for each candidate query,
         an in-place priority queue is maintained to identify the kNN's. */
-    ArffData* train = data->train;
-    ArffData* test = data->test;
-    int* predictions = data->predictions;
-    int k = data->k;
-    
+    ArffData* train = data.train;
+    ArffData* test = data.test;
+    int* predictions = data.predictions;
+    int k = data.k;
+
     int ntasks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -50,31 +48,29 @@ void KNN(struct arguments* data) {
     int num_classes = train->num_classes();
     // Stores bincounts of each class over the final set of candidate NN
     int* classCounts = (int*)calloc(num_classes, sizeof(int));
-
     // variables for scattering
-    float test_floats[test->num_instances][num_classes];
-    // I assume MPI_Scatter() can't deal with arff data, so I'm casting it to floats
     // getting the number of dimensions
     int dim = test->get_instance(0)->size() - 1;
+    float test_floats[test->num_instances()][dim];
+    // I assume MPI_Scatter() can't deal with arff data, so I'm casting it to floats
     for(int queryIndex = 0; queryIndex < test->num_instances(); queryIndex++) {
         for (int i = 0; i < dim; i++) {
             test_floats[queryIndex][i] = test->get_instance(queryIndex)->get(i)->operator float();
         }
     }
-
-    int count = test->num_instances / ntasks;
-    rec_buffer[count];
+    int count = test->num_instances() / ntasks;
+    float rec_buffer[count][dim];
     int source = 0;
-    MPI_Scatter(test_floats, count, MPI_FLOAT, rec_buffer, count, MPI_FLOAT, source, MPI_COMM_WORLD)
-    
+    MPI_Scatter(test_floats, count, MPI_FLOAT, rec_buffer, count, MPI_FLOAT, source, MPI_COMM_WORLD);
+            cout<<rank<<" "<<test_floats[7][3]<<endl;
+            cout<<rank<<" "<<rec_buffer[7][3]<<endl;
+
     // this will be used in MPI_Gather()
     int* gat_send = (int*)malloc(count * sizeof(int));
-
     for(int queryIndex = 0; queryIndex < count; queryIndex++) {
+        cout<<queryIndex<<endl;
         for(int keyIndex = 0; keyIndex < train->num_instances(); keyIndex++) {
-            
             float dist = distance(rec_buffer[queryIndex], train->get_instance(keyIndex));
-
             // Add to our candidates
             for(int c = 0; c < k; c++){
                 if(dist < candidates[2 * c]){
@@ -84,10 +80,9 @@ void KNN(struct arguments* data) {
                         candidates[2 * x + 2] = candidates[2 * x];
                         candidates[2 * x + 3] = candidates[2 * x + 1];
                     }
-                    
                     // Set key vector as potential k NN
                     candidates[2 * c] = dist;
-                    candidates[2 * c + 1] = train->get_instance(keyIndex)->get(train->num_attributes() - 1)->operator float(); // class value
+                    candidates[2 * c + 1] = train->get_instance(keyIndex)->get(train->num_attributes() - 1)->operator float(); // class value;
                     break;
                 }
             }
@@ -106,16 +101,16 @@ void KNN(struct arguments* data) {
                 max_index = i;
             }
         }
-
         gat_send[queryIndex] = max_index;
 
-        for(int i = 0; i < 2*k; i++){candidates[i] = FLT_MAX;}
+        for(int i = 0; i < 2*k; i++) {candidates[i] = FLT_MAX;}
         memset(classCounts, 0, num_classes * sizeof(int));
     }
     
+
     MPI_Gather(gat_send, count, MPI_FLOAT, predictions, count, MPI_FLOAT, 0, MPI_COMM_WORLD);
     MPI_Finalize();
-    free(gat_send)
+    free(gat_send);
 }
 
 int* computeConfusionMatrix(int* predictions, ArffData* dataset) {
@@ -146,8 +141,6 @@ float computeAccuracy(int* confusionMatrix, ArffData* dataset)
 
 int main(int argc, char *argv[]){
 
-    MPI_Init(&argc,&argv);
-
     if(argc != 4)
     {
         cout << "Usage: mpiexec -np <n> ./main_mpi datasets/train.arff datasets/test.arff k" << endl;
@@ -165,13 +158,12 @@ int main(int argc, char *argv[]){
     struct timespec start, end;
     
     clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-    
     struct arguments arg_struct;
     arg_struct.train = train;
     arg_struct.test = test;
     arg_struct.predictions = predictions;
     arg_struct.k = k;
-
+    MPI_Init(&argc, &argv);
     KNN(arg_struct);
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);

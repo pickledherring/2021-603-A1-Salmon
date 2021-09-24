@@ -7,8 +7,8 @@
 
 #include <vector>
 
-#include <arff_utils.h>
-#include <arff_value.h>
+#include "arff_utils.h"
+#include "arff_value.h"
 
 
 /**
