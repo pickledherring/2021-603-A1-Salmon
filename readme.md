@@ -1,9 +1,14 @@
 ## Serial, multithreaded, and MPI implementations of a KNN
 ---
-`main` is the serial version, `main_par` is the pthread parallelized version, and `main_mpi` will be the mpi version.
+`main` is the serial version, `main_par` is the pthread version, and `main_mpi` is the mpi version.
 
 Run the code with `./<version> datasets/<size>-train datasets/<size>-test <K> <#threads>`.\
 Leave off `#threads` if running `main`.
 
 For example:\
 `./main_par datasets/small-train datasets/small-test 3 8`
+
+For MPI, run `mpiexec [-np <#processes>] [--oversubscribe] ./main_mpi datasets/<size>-train datasets/<size>-test <K>`
+
+For example:\
+`mpiexec -np 4 --oversubscribe ./main_mpi datasets/small-train datasets/small-test 3`

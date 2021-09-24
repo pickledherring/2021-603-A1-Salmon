@@ -8,8 +8,8 @@
 #include "libarff/arff_parser.h"
 #include "libarff/arff_data.h"
 #include "mpi.h"
-// #include <bits/stdc++.h>
-#include "bits_file/stdc++.h"
+#include <bits/stdc++.h>
+// #include "bits_file/stdc++.h"
 
 using namespace std;
 
@@ -78,7 +78,7 @@ void KNN(struct arguments data) {
                     }
                     // Set key vector as potential k NN
                     candidates[2 * c] = dist;
-                    candidates[2 * c + 1] = train->get_instance(keyIndex)->get(train->num_attributes() - 1)->operator float(); // class value;
+                    candidates[2 * c + 1] = train->get_instance(keyIndex)->get(train->num_attributes() - 1)->operator float();
                     break;
                 }
             }
@@ -98,7 +98,7 @@ void KNN(struct arguments data) {
             }
         }
         gat_send[queryIndex] = max_index;
-        for(int i = 0; i < 2*k; i++) {candidates[i] = FLT_MAX;}
+        for(int i = 0; i < 2 * k; i++) {candidates[i] = FLT_MAX;}
         memset(classCounts, 0, num_classes * sizeof(int));
     }
     MPI_Gather(gat_send, count, MPI_FLOAT, predictions, count, MPI_FLOAT, 0, MPI_COMM_WORLD);
@@ -146,20 +146,21 @@ int main(int argc, char *argv[]){
     ArffData * train = parserTrain.parse();
     ArffData * test = parserTest.parse();
     int * predictions = (int*)malloc(test->num_instances() * sizeof(int));
-    struct timespec start, end;
-    
-    clock_gettime(CLOCK_MONOTONIC_RAW, &start);
     struct arguments arg_struct;
     arg_struct.train = train;
     arg_struct.test = test;
     arg_struct.predictions = predictions;
     arg_struct.k = k;
+    
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &start);
     MPI_Init(&argc, &argv);
     KNN(arg_struct);
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);
     
-    int rank;
+    int rank, ntasks;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
     MPI_Finalize();
     if (rank == 0) {
         // Compute the confusion matrix
@@ -169,7 +170,8 @@ int main(int argc, char *argv[]){
 
         uint64_t diff = (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6;
 
-        printf("The %i-NN classifier for %lu test instances on %lu train instances required %llu ms CPU time. Accuracy was %.4f\n",
-                    k, test->num_instances(), train->num_instances(), (long long unsigned int) diff, accuracy);
+        printf("The %i-NN classifier using %i cores for %lu test instances on %lu train instances required %llu ms CPU time. Accuracy was %.4f\n",
+                    k, ntasks, test->num_instances(), train->num_instances(), (long long unsigned int) diff, accuracy);
     }
+    free(predictions);
 }

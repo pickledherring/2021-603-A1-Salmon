@@ -8,8 +8,8 @@
 #include <semaphore.h>
 #include "libarff/arff_parser.h"
 #include "libarff/arff_data.h"
-#include "bits_file/stdc++.h"
-// #include <bits/stdc++.h>
+// #include "bits_file/stdc++.h"
+#include <bits/stdc++.h>
 
 using namespace std;
 
@@ -23,8 +23,8 @@ struct arguments{
 };
  // sem_init needs a regular semaphore while sem_open needs a pointer to one
  // linux top, mac bottom
-// sem_t sem_main;
-sem_t* sem_main;
+sem_t sem_main;
+// sem_t* sem_main;
 
 float distance(ArffInstance* a, ArffInstance* b) {
     float sum = 0;
@@ -95,8 +95,8 @@ void* KNN(void* data) {
         memset(classCounts, 0, num_classes * sizeof(int));
     }
     // linux top, mac bottom
-    // sem_post(&sem_main);
-    sem_post(sem_main);
+    sem_post(&sem_main);
+    // sem_post(sem_main);
     pthread_exit(0);
 }
 
@@ -147,8 +147,8 @@ int main(int argc, char* argv[]) {
     struct arguments arg_array[n_threads];
     clock_gettime(CLOCK_MONOTONIC_RAW, &start);
     //  linux can use sem_init, mac can't
-    // sem_init(&sem_main, 0, n_threads);
-    sem_open("sem_main", NULL, NULL, n_threads);
+    sem_init(&sem_main, 0, n_threads);
+    // sem_open("sem_main", NULL, NULL, n_threads);
 
     for (int i = 0; i < n_threads; i++) {
         arg_array[i].train = train;
@@ -161,8 +161,8 @@ int main(int argc, char* argv[]) {
     }
 
     // linux top, mac bottom
-    // sem_wait(&sem_main);
-    sem_wait(sem_main);
+    sem_wait(&sem_main);
+    // sem_wait(sem_main);
 
     for (int i = 0; i < n_threads; i++)
         pthread_join(threads[i], NULL);
@@ -177,5 +177,5 @@ int main(int argc, char* argv[]) {
     uint64_t diff = (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6;
 
     printf("The %i-NN classifier using %i threads for %lu test instances on %lu train instances required %llu ms CPU time. Accuracy was %.4f\n",
-                        k, n_threads, test->num_instances(), train->num_instances(), (long long unsigned int) diff, accuracy);
+                    k, n_threads, test->num_instances(), train->num_instances(), (long long unsigned int) diff, accuracy);
 }
