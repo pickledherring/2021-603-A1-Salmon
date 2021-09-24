@@ -37,9 +37,8 @@ void KNN(struct arguments data) {
     int* predictions = data.predictions;
     int k = data.k;
 
-    int ntasks, rank;
+    int ntasks;
     MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     
     // stores k-NN candidates for a query vector as a sorted 2d array. First element is inner product, second is class.
     float* candidates = (float*)calloc(k * 2, sizeof(float));
@@ -49,7 +48,7 @@ void KNN(struct arguments data) {
     // Stores bincounts of each class over the final set of candidate NN
     int* classCounts = (int*)calloc(num_classes, sizeof(int));
     // variables for scattering
-    // getting the number of dimensions
+    // getting the number of dimensions (last element is the class)
     int dim = test->get_instance(0)->size() - 1;
     float test_floats[test->num_instances()][dim];
     // I assume MPI_Scatter() can't deal with arff data, so I'm casting it to floats
@@ -61,14 +60,11 @@ void KNN(struct arguments data) {
     int count = test->num_instances() / ntasks;
     float rec_buffer[count][dim];
     int source = 0;
-    MPI_Scatter(test_floats, count, MPI_FLOAT, rec_buffer, count, MPI_FLOAT, source, MPI_COMM_WORLD);
-            cout<<rank<<" "<<test_floats[7][3]<<endl;
-            cout<<rank<<" "<<rec_buffer[7][3]<<endl;
+    MPI_Scatter(test_floats, count * dim, MPI_FLOAT, rec_buffer, count * dim, MPI_FLOAT, source, MPI_COMM_WORLD);
 
     // this will be used in MPI_Gather()
     int* gat_send = (int*)malloc(count * sizeof(int));
     for(int queryIndex = 0; queryIndex < count; queryIndex++) {
-        cout<<queryIndex<<endl;
         for(int keyIndex = 0; keyIndex < train->num_instances(); keyIndex++) {
             float dist = distance(rec_buffer[queryIndex], train->get_instance(keyIndex));
             // Add to our candidates
@@ -102,15 +98,10 @@ void KNN(struct arguments data) {
             }
         }
         gat_send[queryIndex] = max_index;
-
         for(int i = 0; i < 2*k; i++) {candidates[i] = FLT_MAX;}
         memset(classCounts, 0, num_classes * sizeof(int));
     }
-    
-
     MPI_Gather(gat_send, count, MPI_FLOAT, predictions, count, MPI_FLOAT, 0, MPI_COMM_WORLD);
-    MPI_Finalize();
-    free(gat_send);
 }
 
 int* computeConfusionMatrix(int* predictions, ArffData* dataset) {
@@ -165,15 +156,20 @@ int main(int argc, char *argv[]){
     arg_struct.k = k;
     MPI_Init(&argc, &argv);
     KNN(arg_struct);
-
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+    
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Finalize();
+    if (rank == 0) {
+        // Compute the confusion matrix
+        int* confusionMatrix = computeConfusionMatrix(predictions, test);
+        // Calculate the accuracy
+        float accuracy = computeAccuracy(confusionMatrix, test);
 
-    // Compute the confusion matrix
-    int* confusionMatrix = computeConfusionMatrix(predictions, test);
-    // Calculate the accuracy
-    float accuracy = computeAccuracy(confusionMatrix, test);
+        uint64_t diff = (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6;
 
-    uint64_t diff = (1000000000L * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec) / 1e6;
-
-    printf("The %i-NN classifier for %lu test instances on %lu train instances required %llu ms CPU time. Accuracy was %.4f\n", k, test->num_instances(), train->num_instances(), (long long unsigned int) diff, accuracy);
+        printf("The %i-NN classifier for %lu test instances on %lu train instances required %llu ms CPU time. Accuracy was %.4f\n",
+                    k, test->num_instances(), train->num_instances(), (long long unsigned int) diff, accuracy);
+    }
 }
